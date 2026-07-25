@@ -131,13 +131,36 @@ jobs:
         run: |
           ls -lR artifacts
           cat > notes.md <<'EOF'
-          Self-contained builds - Python is not required.
+          Self-contained - Python is not required. Reads WAV, MP3, FLAC and OGG.
 
-          - **Windows** - unzip and run `CustomMusic.exe`.
-          - **macOS** - unzip, then right-click the app and choose *Open* the first time. The build is signed only ad-hoc, so a plain double-click is blocked.
-          - **Linux** - `tar xzf`, then `./CustomMusic`.
+          Run with no arguments for the window, or pass arguments for the command line (`--help`).
 
-          Run it with no arguments for the window, or pass arguments to use the command line; see `--help`.
+          ### Windows - `CustomMusic-windows-x64.zip`
+
+          Unzip and run `CustomMusic.exe`. SmartScreen may warn on first run: *More info* -> *Run anyway*.
+
+          ### macOS - `CustomMusic-macos-arm64.zip` (Apple Silicon) or `CustomMusic-macos-x64.zip` (Intel)
+
+          Not sure which? Apple menu -> *About This Mac*. "Apple M1/M2/M3/M4" -> arm64, "Intel" -> x64.
+
+          1. Unzip, then drag `CustomMusic.app` to Applications.
+          2. The app isn't notarised, so the first launch is blocked. **Control-click (right-click) it -> Open**, then **Open** again in the dialog.
+          3. If macOS still refuses: **System Settings -> Privacy & Security**, scroll to the bottom, click **Open Anyway**, then reopen the app.
+
+          It opens normally after that. Terminal alternative:
+          `xattr -dr com.apple.quarantine /Applications/CustomMusic.app`
+
+          Command line: `/Applications/CustomMusic.app/Contents/MacOS/CustomMusic --help`
+
+          ### Linux - `CustomMusic-linux-x64.tar.gz`
+
+          ```
+          tar xzf CustomMusic-linux-x64.tar.gz
+          chmod +x CustomMusic
+          ./CustomMusic
+          ```
+
+          Built on Ubuntu 22.04 - needs glibc 2.35 or newer.
           EOF
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" artifacts/* --clobber
