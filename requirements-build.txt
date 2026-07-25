@@ -1,0 +1,7 @@
+# Everything needed to produce a release build.
+# The app itself runs on a bare Python 3.7+; these make the frozen build fast
+# and self-contained.
+
+pyinstaller>=6.0
+numpy>=1.21        # ~40x faster encoding, and the good resampler
+miniaudio>=1.59    # mp3 / flac / ogg decoding with no external programs

@@ -1,0 +1,14 @@
+# PyInstaller
+build/
+dist/
+out/
+*.manifest
+
+# Local state -- holds whichever dump folder you last used
+settings.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/

@@ -1,0 +1,147 @@
+name: Build
+
+# Assumes this app sits at the repository root (the folder holding
+# custom_music.py and CustomMusic.spec).  If you nest it inside a larger repo,
+# set APP_DIR below to that subfolder, e.g. "Project Rio/Custom Music".
+env:
+  APP_DIR: .
+  PYTHON_VERSION: '3.11'
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write        # needed only by the release job
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows x64
+            asset: CustomMusic-windows-x64.zip
+          - os: macos-13
+            label: macOS Intel
+            asset: CustomMusic-macos-x64.zip
+          - os: macos-14
+            label: macOS Apple Silicon
+            asset: CustomMusic-macos-arm64.zip
+          # Oldest supported runner: PyInstaller binaries need a glibc at least
+          # as new as the one they were built against.
+          - os: ubuntu-22.04
+            label: Linux x64
+            asset: CustomMusic-linux-x64.tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # setup-python's Linux build links _tkinter against the system Tcl/Tk,
+      # which the runner image does not ship.
+      - name: Install Tk (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk tk
+
+      - name: Install build dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-build.txt
+
+      - name: Check tkinter is importable
+        run: python -c "import tkinter; print('Tk', tkinter.TkVersion)"
+
+      - name: Run the self-test
+        working-directory: ${{ env.APP_DIR }}
+        run: python selftest.py
+
+      - name: Build
+        working-directory: ${{ env.APP_DIR }}
+        run: pyinstaller --clean --noconfirm CustomMusic.spec
+
+      # An arm64 macOS binary will not launch at all unless it carries a
+      # signature; an ad-hoc one is enough to get past that.
+      - name: Ad-hoc sign (macOS)
+        if: runner.os == 'macOS'
+        working-directory: ${{ env.APP_DIR }}
+        run: codesign --force --deep --sign - dist/CustomMusic.app
+
+      - name: Smoke-test the binary
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Windows) BIN="dist/CustomMusic.exe" ;;
+            macOS)   BIN="dist/CustomMusic.app/Contents/MacOS/CustomMusic" ;;
+            *)       BIN="dist/CustomMusic" ;;
+          esac
+          "$BIN" --list | head -n 3
+          # The decoder must be baked in, or MP3 support silently disappears.
+          "$BIN" --list | grep -q miniaudio || {
+            echo "::error::miniaudio is missing from the bundle"; exit 1; }
+
+      - name: Package
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: |
+          mkdir -p out
+          cp README.md dist/ 2>/dev/null || true
+          cd dist
+          case "${{ runner.os }}" in
+            Windows) 7z a -tzip "../out/${{ matrix.asset }}" CustomMusic.exe README.md ;;
+            macOS)   ditto -c -k --sequesterRsrc --keepParent CustomMusic.app "../out/${{ matrix.asset }}" ;;
+            *)       chmod +x CustomMusic && tar czf "../out/${{ matrix.asset }}" CustomMusic README.md ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ env.APP_DIR }}/out/${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create the release and attach the builds
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -lR artifacts
+          cat > notes.md <<'EOF'
+          Self-contained builds - Python is not required.
+
+          - **Windows** - unzip and run `CustomMusic.exe`.
+          - **macOS** - unzip, then right-click the app and choose *Open* the first time. The build is signed only ad-hoc, so a plain double-click is blocked.
+          - **Linux** - `tar xzf`, then `./CustomMusic`.
+
+          Run it with no arguments for the window, or pass arguments to use the command line; see `--help`.
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/* --clobber
+          else
+            gh release create "$TAG" --title "Custom Music $TAG" \
+              --notes-file notes.md artifacts/*
+          fi
