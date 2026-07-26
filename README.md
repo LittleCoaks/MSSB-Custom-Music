@@ -208,8 +208,8 @@ near-ties. A fair comparison has to feed both encoders the same source audio.
 ## Building a release
 
 `.github/workflows/build.yml` builds a self-contained binary for Windows, macOS
-(Intel and Apple Silicon) and Linux on every push, and attaches them to a GitHub
-Release when you push a tag:
+(Apple Silicon) and Linux on every push, and attaches them to a GitHub Release
+when you push a tag:
 
 ```
 git tag v1.0.0 && git push --tags
@@ -247,6 +247,10 @@ A few things the packaging has to get right, in case you change it:
   launch at all. It is still not notarised, so the first launch needs
   right-click → *Open*; `xattr -dr com.apple.quarantine CustomMusic.app` also
   works.
+* **Only Apple Silicon is built.** The Intel runner (`macos-13`) stalled, and
+  Intel Macs are the shrinking side of the split. Anyone on one can run from
+  source — `pip install numpy miniaudio` and `python custom_music.py` — or add
+  the `macos-13` entry back to the matrix.
 * **Linux builds on ubuntu-22.04** because a PyInstaller binary needs a glibc at
   least as new as the one it was built against. `python3-tk` has to be installed
   for the runner's Tk libraries.

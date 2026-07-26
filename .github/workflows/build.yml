@@ -28,9 +28,8 @@ jobs:
           - os: windows-latest
             label: Windows x64
             asset: CustomMusic-windows-x64.zip
-          - os: macos-13
-            label: macOS Intel
-            asset: CustomMusic-macos-x64.zip
+          # Intel macOS (macos-13) is deliberately not built: the runner stalls,
+          # and Intel Macs can run from source instead.
           - os: macos-14
             label: macOS Apple Silicon
             asset: CustomMusic-macos-arm64.zip
@@ -139,9 +138,9 @@ jobs:
 
           Unzip and run `CustomMusic.exe`. SmartScreen may warn on first run: *More info* -> *Run anyway*.
 
-          ### macOS - `CustomMusic-macos-arm64.zip` (Apple Silicon) or `CustomMusic-macos-x64.zip` (Intel)
+          ### macOS (Apple Silicon) - `CustomMusic-macos-arm64.zip`
 
-          Not sure which? Apple menu -> *About This Mac*. "Apple M1/M2/M3/M4" -> arm64, "Intel" -> x64.
+          For M1/M2/M3/M4 Macs. On an Intel Mac, run from source instead - see the README.
 
           1. Unzip, then drag `CustomMusic.app` to Applications.
           2. The app isn't notarised, so the first launch is blocked. **Control-click (right-click) it -> Open**, then **Open** again in the dialog.
